@@ -1,0 +1,16 @@
+{
+  "name": "severmodul-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal PostgreSQL connection setup for the SeverModul project",
+  "scripts": {
+    "check:db": "node server/check-db.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "pg": "^8.16.3"
+  }
+}
