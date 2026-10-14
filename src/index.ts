@@ -168,7 +168,7 @@ function getTopicScore(topic: TopicKey, record: KnowledgeRecord): number {
       if (priceCategoryNames.has(category)) return 160;
       // Price-bearing model records may use categories other than "houses" or "faq".
       // Keep them eligible for price queries; lexical ranking will prioritize the named model.
-      if (/цена|стоимост|от\\s*[\\d\\s.,]+\\s*(?:₽|руб)|[\\d\\s.,]+\\s*(?:₽|руб)|м²|м2/iu.test(content)) {
+      if (/цена|стоимост|от\s*[\d\s.,]+\s*(?:₽|руб)|[\d\s.,]+\s*(?:₽|руб)|м²|м2/iu.test(content)) {
         return 70;
       }
       return 0;
