@@ -1319,7 +1319,12 @@ document.querySelectorAll('.rev-nav button').forEach(btn => {
 
     showTyping('Ищу информацию...');
     try {
-      const params = new URLSearchParams({ q: text });
+      let sessionId = localStorage.getItem('severmodul_session_id');
+      if (!sessionId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
+        sessionId = crypto.randomUUID();
+        localStorage.setItem('severmodul_session_id', sessionId);
+      }
+      const params = new URLSearchParams({ q: text, session_id: sessionId });
       const response = await fetch(
         `https://br-hidden-mud-b20xmgw7-severmodul.compute.c-6.eu-central-1.aws.neon.tech/?${params.toString()}`,
         { signal: AbortSignal.timeout(20000) }
