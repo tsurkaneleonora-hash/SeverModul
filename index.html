@@ -403,6 +403,7 @@ footer{border-top:1px solid var(--line);padding:80px 0 40px;background:var(--bg)
   font-size:14.5px;line-height:1.5;
   animation:msgIn .4s var(--ease) backwards;
   word-wrap:break-word;
+  white-space:pre-line;
 }
 .chat-msg.user{
   align-self:flex-end;
@@ -419,6 +420,17 @@ footer{border-top:1px solid var(--line);padding:80px 0 40px;background:var(--bg)
 .chat-msg.bot .chat-list{margin-top:8px;display:grid;gap:4px;}
 .chat-msg.bot .chat-list li{list-style:none;padding-left:18px;position:relative;}
 .chat-msg.bot .chat-list li::before{content:"·";position:absolute;left:6px;color:var(--accent);font-weight:700;}
+.chat-retry{display:block;margin-top:8px;padding:0;background:none;color:var(--accent);font:inherit;font-weight:600;text-decoration:underline;}
+.chat-lead-offer{align-self:flex-start;width:min(85%,360px);}
+.chat-lead-offer>button,.chat-lead-form button{padding:9px 14px;border:1px solid var(--accent);border-radius:100px;background:var(--surface);color:var(--accent);font:inherit;font-size:13px;font-weight:600;}
+.chat-lead-form{display:grid;gap:9px;margin-top:10px;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);}
+.chat-lead-form[hidden]{display:none;}
+.chat-lead-form label{display:grid;gap:4px;font-size:12px;color:var(--ink-soft);}
+.chat-lead-form input,.chat-lead-form textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg-soft);color:var(--ink);font:inherit;font-size:14px;}
+.chat-lead-form textarea{min-height:64px;resize:vertical;}
+.chat-lead-form button{justify-self:start;background:var(--accent);color:var(--accent-ink);}
+.chat-lead-form button:disabled{opacity:.6;cursor:wait;}
+.chat-lead-status{margin:0;font-size:13px;line-height:1.45;color:var(--ink-soft);}
 @keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 .chat-typing{
@@ -1189,37 +1201,12 @@ document.querySelectorAll('.rev-nav button').forEach(btn => {
   const input = document.getElementById('chatInput');
   const sendBtn = document.getElementById('chatSend');
   const badge = document.getElementById('chatBadge');
-
-  /* База знаний для локальных ответов */
-  const KNOWLEDGE = {
-    projects: 'В нашей коллекции 3 проекта:\n<ul class="chat-list"><li><b>Сосна</b> — 45 м², 1 спальня — от 2 790 000 ₽</li><li><b>Мох</b> — 64 м², 2 спальни + сауна — от 3 970 000 ₽</li><li><b>Тайга</b> — 96 м², 3 спальни — от 5 950 000 ₽</li></ul>',
-    price: 'Стоимость начинается от <b>72 000 ₽/м²</b>. Сейчас действует скидка <b>10 000 ₽</b> до 15 сентября. Финальная цена фиксируется в договоре и не меняется в процессе.<br><br>Примеры: Сосна 45 м² — от 2 790 000 ₽, Мох 64 м² — от 3 970 000 ₽, Тайга 96 м² — от 5 950 000 ₽.',
-    winter: 'Да, наши дома предназначены для круглогодичного проживания, в том числе зимой. Утепление — <b>200 мм каменной ватой</b> (для комплектации «Север»), энергоэффективные стеклопакеты. Рассчитаны на морозы до −35 °C. Счёт за отопление зимой для дома 64 м² — около 3 000 ₽ в месяц.',
-    insulation: 'Многослойный пирог стены:<ul class="chat-list"><li>Фасад из сибирской лиственницы</li><li>Вентзазор 40 мм</li><li>Каменная вата 200 мм</li><li>Интеллектуальная пароизоляция</li><li>Внутренняя отделка</li></ul>Класс энергоэффективности — А.',
-    term: 'Срок реализации — <b>30–45 дней</b> от подписания договора до ключей. 95% работ проходит в цеху, на вашем участке — только монтаж за 1–3 дня.',
-    delivery: 'Доставка манипуляторами по СПб и ЛО. До 100 км от КАД — <b>бесплатно</b>, включено в стоимость. Дальше 100 км — по тарифу (уточняем после проверки подъезда).',
-    mounting: 'Монтаж занимает 1–3 дня: установка модулей краном на фундамент (свайно-винтовой или бетонные блоки), стыковка, подключение коммуникаций. После нас — чистая площадка, никакой грязи на участке.',
-    completion: 'Комплектации:<ul class="chat-list"><li><b>Предчистовая (White Box)</b> — входит в базовую цену</li><li><b>Под ключ</b> (+15%) — с мебелью и освещением, можно заезжать сразу</li></ul>Плюс опции: терраса, панорамные окна, тёплые полы, умный дом.',
-    area: 'Площади наших проектов: Сосна — 45 м², Мох — 64 м², Тайга — 96 м². Любой проект можно адаптировать под ваш участок или спроектировать индивидуальный.',
-    bedrooms: 'Количество спален: Сосна — 1 спальня, Мох — 2 спальни, Тайга — 3 спальни. Планировки можно адаптировать под ваш запрос.'
-  };
-
-  /* Ключевые слова → тема */
-  const TOPICS = [
-    { keys: ['проект','домов','дома','какие','модель','коллекция','ассортимент','линейка','вариант'], topic: 'projects' },
-    { keys: ['цена','стоимость','стоит','сколько','рубл','₽','дорого','бюджет','цена','недёшево'], topic: 'price' },
-    { keys: ['зима','зимой','зимн','холод','мороз','тепло','греть','отоплен'], topic: 'winter' },
-    { keys: ['утепл','теплоизоляц','пирог','стен','материал'], topic: 'insulation' },
-    { keys: ['срок','долго','когда','дней','месяц','быстро','скорость','время','построить','строить'], topic: 'term' },
-    { keys: ['достав','привез','логистик','манипул','трансп','перевез'], topic: 'delivery' },
-    { keys: ['монтаж','установ','собир','фундамент','кран','свай'], topic: 'mounting' },
-    { keys: ['комплект','отделк','white box','под ключ','мебел','чистов','предчист'], topic: 'completion' },
-    { keys: ['площад','квадрат','м2','м²','размер','метр'], topic: 'area' },
-    { keys: ['спаль','комнат','спальн'], topic: 'bedrooms' }
-  ];
+  const functionUrl = 'https://br-lingering-bird-b2kw6c2d-severmodul.compute.c-6.eu-central-1.aws.neon.tech/';
+  let sessionId = null;
 
   let isOpen = false;
   let unread = 1; // стартовое сообщение
+  let isSending = false;
 
   function openChat(){
     isOpen = true;
@@ -1268,6 +1255,131 @@ document.querySelectorAll('.rev-nav button').forEach(btn => {
     if (t) t.remove();
   }
 
+  function getSessionId(){
+    if (sessionId) return sessionId;
+    try {
+      const saved = localStorage.getItem('severmodul_session_id');
+      if (saved && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(saved)) {
+        sessionId = saved;
+      }
+    } catch (error) {
+      console.warn('Chat session could not be read from local storage.', error);
+    }
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      try {
+        localStorage.setItem('severmodul_session_id', sessionId);
+      } catch (error) {
+        console.warn('Chat session could not be persisted in local storage.', error);
+      }
+    }
+    return sessionId;
+  }
+
+  function addTextMessage(text, role){
+    const message = document.createElement('div');
+    message.className = 'chat-msg ' + (role === 'user' ? 'user' : 'bot');
+    message.textContent = text;
+    body.appendChild(message);
+    body.scrollTop = body.scrollHeight;
+    return message;
+  }
+
+  function addLeadOffer(question){
+    const section = document.createElement('div');
+    section.className = 'chat-lead-offer';
+    const openButton = document.createElement('button');
+    openButton.type = 'button';
+    openButton.textContent = 'Попросить менеджера связаться';
+
+    const form = document.createElement('form');
+    form.className = 'chat-lead-form';
+    form.hidden = true;
+
+    const nameLabel = document.createElement('label');
+    nameLabel.appendChild(document.createTextNode('Ваше имя'));
+    const nameInput = document.createElement('input');
+    nameInput.name = 'name';
+    nameInput.type = 'text';
+    nameInput.autocomplete = 'name';
+    nameInput.maxLength = 120;
+    nameInput.required = true;
+    nameLabel.appendChild(nameInput);
+
+    const contactLabel = document.createElement('label');
+    contactLabel.appendChild(document.createTextNode('Телефон или другой контакт'));
+    const contactInput = document.createElement('input');
+    contactInput.name = 'contact';
+    contactInput.type = 'text';
+    contactInput.autocomplete = 'tel';
+    contactInput.maxLength = 200;
+    contactInput.required = true;
+    contactLabel.appendChild(contactInput);
+
+    const questionLabel = document.createElement('label');
+    questionLabel.appendChild(document.createTextNode('Ваш вопрос'));
+    const questionInput = document.createElement('textarea');
+    questionInput.name = 'question';
+    questionInput.maxLength = 2000;
+    questionInput.required = true;
+    questionInput.value = question;
+    questionLabel.appendChild(questionInput);
+
+    const submitButton = document.createElement('button');
+    submitButton.type = 'submit';
+    submitButton.textContent = 'Отправить заявку';
+    const status = document.createElement('p');
+    status.className = 'chat-lead-status';
+    status.setAttribute('role', 'status');
+    form.append(nameLabel, contactLabel, questionLabel, submitButton, status);
+    section.append(openButton, form);
+    body.appendChild(section);
+
+    openButton.addEventListener('click', () => {
+      openButton.hidden = true;
+      form.hidden = false;
+      nameInput.focus();
+      body.scrollTop = body.scrollHeight;
+    });
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (submitButton.disabled) return;
+      submitButton.disabled = true;
+      status.textContent = 'Отправляю заявку...';
+      try {
+        const params = new URLSearchParams({ action: 'lead', session_id: getSessionId() });
+        const response = await fetch(functionUrl + '?' + params.toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: nameInput.value.trim(),
+            contact: contactInput.value.trim(),
+            question: questionInput.value.trim()
+          }),
+          signal: AbortSignal.timeout(20000)
+        });
+        let data;
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error('invalid_response');
+        }
+        if (!response.ok || data.ok !== true) {
+          throw new Error(typeof data.error === 'string' ? data.error : 'request_failed');
+        }
+        form.replaceChildren();
+        const confirmation = document.createElement('p');
+        confirmation.className = 'chat-lead-status';
+        confirmation.textContent = 'Заявка сохранена и передана менеджеру. Спасибо!';
+        form.appendChild(confirmation);
+        body.scrollTop = body.scrollHeight;
+      } catch {
+        status.textContent = 'Не удалось подтвердить отправку. Проверьте соединение и попробуйте ещё раз.';
+        submitButton.disabled = false;
+      }
+    });
+  }
+
   /* Инициализация приветствия */
   const welcomeMessage = addMessage('Здравствуйте! Я консультант «СеверМодуль». Помогу подобрать дом, разобраться с ценой, сроками, комплектацией и строительством.', 'bot');
   const quickQuestions = body.querySelector('.chat-quick');
@@ -1280,60 +1392,66 @@ document.querySelectorAll('.rev-nav button').forEach(btn => {
     sendMessage();
   });
 
-  /* Распознавание темы */
-  function detectTopic(text){
-    const t = text.toLowerCase();
-    for (const topic of TOPICS){
-      for (const key of topic.keys){
-        if (t.includes(key)) return topic.topic;
+  async function restoreHistory(){
+    try {
+      const params = new URLSearchParams({ action: 'history', session_id: getSessionId() });
+      const response = await fetch(functionUrl + '?' + params.toString(), {
+        signal: AbortSignal.timeout(12000)
+      });
+      if (!response.ok) throw new Error('History request failed');
+      const data = await response.json();
+      if (data.ok !== true || !Array.isArray(data.messages)) {
+        throw new Error('Invalid history response');
       }
+      const messages = data.messages.filter(message =>
+        message && (message.role === 'user' || message.role === 'assistant') &&
+        typeof message.content === 'string'
+      );
+      if (messages.length) {
+        body.replaceChildren();
+        messages.forEach(message =>
+          addTextMessage(message.content, message.role === 'user' ? 'user' : 'bot')
+        );
+        body.appendChild(quickQuestions);
+        const latestQuestion = [...messages].reverse().find(message => message.role === 'user');
+        if (latestQuestion) addLeadOffer(latestQuestion.content);
+      }
+    } catch (error) {
+      console.warn('Chat history could not be restored.', error);
+      addTextMessage('Не удалось восстановить историю. Вы можете продолжить диалог.', 'bot');
     }
-    return null;
   }
-
-  /* Ответ */
-  function respond(answer, topic){
-    const typing = showTyping();
-    const delay = 800 + Math.random() * 900;
-    setTimeout(() => {
-      removeTyping();
-      addMessage(answer, 'bot');
-      /* Если тема нераспознана — предлагаем оставить контакт */
-      if (!topic){
-        setTimeout(() => {
-          const ctaHtml = 'Если у вас более сложный вопрос — оставьте телефон, и наш архитектор перезвонит в течение 15 минут:<br><a class="chat-cta" href="#cta">Оставить заявку →</a>';
-          addMessage(ctaHtml, 'bot');
-        }, 600);
-      }
-    }, delay);
-  }
+  const historyReady = restoreHistory();
 
   /* Отправка сообщения пользователем */
-  async function sendMessage(){
-    const text = input.value.trim();
-    if (!text) return;
-    addMessage(text.replace(/</g,'&lt;').replace(/>/g,'&gt;'), 'user');
-    input.value = '';
-    autoResize();
-    goal('chat_message_sent');
-
-    showTyping('Ищу информацию...');
+  async function sendMessage(retryText, existingUserMessage, isRetry = false){
+    const text = typeof retryText === 'string' ? retryText : input.value.trim();
+    if (!text || isSending) return;
+    isSending = true;
+    sendBtn.disabled = true;
+    input.disabled = true;
+    let userMessage = existingUserMessage;
     try {
-      let sessionId = localStorage.getItem('severmodul_session_id');
-      if (!sessionId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
-        sessionId = crypto.randomUUID();
-        localStorage.setItem('severmodul_session_id', sessionId);
-      }
+      await historyReady;
+      userMessage = userMessage || addTextMessage(text, 'user');
+      if (!isRetry) goal('chat_message_sent');
+      showTyping('Ищу информацию...');
+      const sessionId = getSessionId();
       const params = new URLSearchParams({ q: text, session_id: sessionId });
-      const response = await fetch(
-        `https://br-hidden-mud-b20xmgw7-severmodul.compute.c-6.eu-central-1.aws.neon.tech/?${params.toString()}`,
-        { signal: AbortSignal.timeout(20000) }
-      );
-      if (!response.ok) {
-        throw new Error('Neon Function request failed');
-      }
+      if (isRetry) params.set('retry', '1');
+      const response = await fetch(functionUrl + '?' + params.toString(), {
+        signal: AbortSignal.timeout(20000)
+      });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('invalid_response');
+      }
+      if (!response.ok) {
+        throw new Error(typeof data.error === 'string' ? data.error : 'request_failed');
+      }
       if (
         data.ok !== true ||
         !Array.isArray(data.results) ||
@@ -1344,14 +1462,38 @@ document.querySelectorAll('.rev-nav button').forEach(btn => {
       }
 
       removeTyping();
-      const resultMessage = document.createElement('div');
-      resultMessage.className = 'chat-msg bot';
-      resultMessage.textContent = data.answer.trim();
-      body.appendChild(resultMessage);
-      body.scrollTop = body.scrollHeight;
-    } catch {
+      addTextMessage(data.answer.trim(), 'assistant');
+      addLeadOffer(text);
+      input.value = '';
+      autoResize();
+    } catch (error) {
       removeTyping();
-      addMessage('Не удалось получить информацию. Попробуйте ещё раз.', 'bot');
+      const reason = error && typeof error.message === 'string' ? error.message : '';
+      const message = addTextMessage(
+        reason === 'Too many requests'
+          ? 'Слишком много запросов. Подождите немного и попробуйте ещё раз.'
+          : reason === 'AbortError' || reason === 'TimeoutError'
+            ? 'Сервер отвечает дольше обычного. Проверьте соединение и повторите отправку.'
+            : reason === 'Database connection is not configured' ||
+                reason === 'Database query failed' ||
+                reason === 'Chat history could not be saved'
+              ? 'Чат временно недоступен из-за ошибки сервера. Ваш текст сохранён — можно повторить отправку.'
+              : 'Не удалось получить ответ. Проверьте соединение и повторите отправку.',
+        'assistant'
+      );
+      const retryButton = document.createElement('button');
+      retryButton.type = 'button';
+      retryButton.className = 'chat-retry';
+      retryButton.textContent = 'Повторить отправку';
+      retryButton.addEventListener('click', () => {
+        message.remove();
+        sendMessage(text, userMessage, true);
+      });
+      message.appendChild(retryButton);
+    } finally {
+      isSending = false;
+      input.disabled = false;
+      autoResize();
     }
   }
 
