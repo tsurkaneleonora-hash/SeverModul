@@ -346,6 +346,27 @@ test("demonstration knowledge is not returned as a factual answer", async () => 
   assert.equal(groqCalls, 0);
 });
 
+test("the explicit is_demo flag excludes records even when their source looks verified", async () => {
+  let groqCalls = 0;
+  global.fetch = async () => {
+    groqCalls++;
+    throw new Error("Groq should not be called for demonstration data");
+  };
+  const app = loadFunction([
+    { ...warrantyRecord, source: "verified-company-data", is_demo: true }
+  ]);
+  const response = await ask(
+    app,
+    "Какая гарантия на дом?",
+    "77777777-7777-4777-8777-777777777778"
+  );
+  const body = await response.json();
+
+  assert.equal(body.results.length, 0);
+  assert.match(body.answer, /нет подтверждённых сведений/iu);
+  assert.equal(groqCalls, 0);
+});
+
 test("greetings are handled without a knowledge-base lookup and saved to history", async () => {
   const app = loadFunction([]);
   const response = await ask(
