@@ -80,6 +80,7 @@ interface KnowledgeRecord {
 
 interface KnowledgeRecordRow extends KnowledgeRecord {
   source?: string | null;
+  is_demo?: boolean;
 }
 
 interface RankedRecord {
@@ -1395,14 +1396,14 @@ export default {
     let records: KnowledgeRecord[];
     try {
       const result = await pool.query(
-        `SELECT id, title, category, content, source
+        `SELECT id, title, category, content, source, is_demo
          FROM knowledge_base
          WHERE is_active = true;`
       );
       const knowledgeRows = result.rows as KnowledgeRecordRow[];
       records = rankRecords(
         knowledgeRows
-          .filter((record) => !isDemonstrationRecord(record))
+          .filter((record) => record.is_demo !== true && !isDemonstrationRecord(record))
           .map(({ id, title, category, content }) => ({ id, title, category, content })),
         searchTerms,
         queryTopics
