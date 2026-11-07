@@ -457,12 +457,13 @@ test("the browser uses GET q and validates the server response fields", () => {
   assert.match(html, /crypto\.randomUUID\(\)/u);
   assert.match(
     html,
-    /br-lingering-bird-b2kw6c2d-severmodul\.compute\.c-6\.eu-central-1\.aws\.neon\.tech/u
+    /br-hidden-mud-b20xmgw7-severmodul\.compute\.c-6\.eu-central-1\.aws\.neon\.tech/u
   );
+  assert.doesNotMatch(html, /br-lingering-bird-b2kw6c2d/u);
   assert.match(html, /method:\s*'POST'/u);
   assert.match(html, /action:\s*'lead'/u);
   assert.match(html, /body:\s*JSON\.stringify\(\{[\s\S]*?name:[\s\S]*?contact:[\s\S]*?question:/u);
-  assert.match(html, /Заявка сохранена и передана менеджеру/u);
+  assert.match(html, /Заявка сохранена\. Спасибо!/u);
   assert.match(html, /response\.ok/u);
   assert.match(html, /data\.ok !== true/u);
   assert.match(html, /!Array\.isArray\(data\.results\)/u);

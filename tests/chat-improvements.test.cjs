@@ -88,6 +88,11 @@ function loadFunction(rows) {
     if (sql.includes("UPDATE leads SET status")) {
       return { rows: state.adminLeadUpdate ? [state.adminLeadUpdate] : [] };
     }
+    if (sql.includes("FROM leads") && sql.includes("WHERE id = $1::uuid")) {
+      return {
+        rows: state.adminLeadDetails?.id === values[0] ? [state.adminLeadDetails] : []
+      };
+    }
     if (sql.includes("FROM conversations c") && sql.includes("COUNT(m.id)")) {
       return { rows: state.adminConversations ?? [] };
     }
@@ -365,6 +370,76 @@ test("the explicit is_demo flag excludes records even when their source looks ve
   assert.equal(body.results.length, 0);
   assert.match(body.answer, /нет подтверждённых сведений/iu);
   assert.equal(groqCalls, 0);
+});
+
+test("active educational records with is_demo=false are used with a clear Groq disclaimer", async () => {
+  const app = loadFunction([
+    {
+      ...warrantyRecord,
+      source: "Учебный каталог — вымышленные данные",
+      is_demo: false
+    }
+  ]);
+  let groqRequest;
+  global.fetch = async (_url, options) => {
+    groqRequest = JSON.parse(options.body);
+    return new Response(
+      JSON.stringify({ choices: [{ message: { content: "В учебной карточке указан срок гарантии 12 лет." } }] }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  };
+
+  const response = await ask(
+    app,
+    "Какая гарантия на дом?",
+    "77777777-7777-4777-8777-777777777779"
+  );
+  const body = await response.json();
+  const prompt = groqRequest.messages.find((message) => message.role === "user").content;
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results.length, 1);
+  assert.equal(body.results[0].id, warrantyRecord.id);
+  assert.equal("isEducational" in body.results[0], false);
+  assert.match(prompt, /"is_educational_demo":true/u);
+  assert.match(groqRequest.messages[0].content, /Используй учебные и демонстрационные материалы по существу вопроса/u);
+  assert.match(body.answer, /^Демонстрационные сведения/u);
+  assert.match(body.answer, /требуют подтверждения/u);
+  assert.match(body.answer, /гарантии 12 лет/u);
+});
+
+test("educational fallback is explicitly labeled when Groq fails or returns empty content", async (t) => {
+  for (const [name, fetchStub] of [
+    ["Groq unavailable", async () => { throw new Error("private Groq transport detail"); }],
+    ["empty Groq response", async () => new Response(
+      JSON.stringify({ choices: [{ message: { content: "  " } }] }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    )]
+  ]) {
+    await t.test(name, async () => {
+      const app = loadFunction([
+        {
+          ...warrantyRecord,
+          source: "Учебный каталог — вымышленные данные",
+          is_demo: false
+        }
+      ]);
+      global.fetch = fetchStub;
+      const response = await ask(
+        app,
+        "Какая гарантия на дом?",
+        "77777777-7777-4777-8777-777777777780"
+      );
+      const body = await response.json();
+
+      assert.equal(response.status, 200);
+      assert.equal(body.answer_source, "knowledge_base");
+      assert.match(body.answer, /^Демонстрационные сведения/u);
+      assert.match(body.answer, /требуют подтверждения/u);
+      assert.ok(body.answer.includes(body.results[0].content));
+      assert.doesNotMatch(JSON.stringify(logs), /private Groq transport detail|test-only/u);
+    });
+  }
 });
 
 test("greetings are handled without a knowledge-base lookup and saved to history", async () => {
@@ -776,6 +851,9 @@ test("admin panel is same-origin, no-store, and protected by a strict CSP", asyn
   assert.match(adminPage, /params\.set\('action'/u);
   assert.match(adminPage, /new URLSearchParams\(action\.slice\(separator \+ 1\)\)/u);
   assert.doesNotMatch(adminPage, /encodeURIComponent\(action\)/u);
+  assert.match(html, /<section id="leadsTab"[\s\S]*?<div id="leadDetails"/u);
+  assert.match(html, /addEventListener\('click',\(\)=>openLead\(lead\.id\)\)/u);
+  assert.match(html, /api\('admin-lead&id='\+encodeURIComponent\(id\)\)/u);
 });
 
 test("admin login rejects invalid credentials and issues an HttpOnly Secure session", async () => {
@@ -886,6 +964,63 @@ test("admin can view a conversation and its linked lead", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.messages.length, 1);
   assert.equal(body.lead.id, state.adminConversationLead.id);
+});
+
+test("admin opens the selected lead with its contact, question and exact conversation history", async () => {
+  const app = loadFunction([]);
+  const leadId = "11111111-1111-4111-8111-111111111111";
+  const conversationId = "22222222-2222-4222-8222-222222222222";
+  state.adminLeadDetails = {
+    id: leadId,
+    conversation_id: conversationId,
+    name: "Synthetic Visitor",
+    contact: "synthetic@example.test",
+    question: "Synthetic lead-specific request",
+    status: "new",
+    created_at: "2026-11-05T10:00:00.000Z",
+    updated_at: "2026-11-05T10:00:00.000Z"
+  };
+  state.adminConversation = {
+    id: conversationId,
+    status: "open",
+    created_at: "2026-11-05T09:00:00.000Z"
+  };
+  state.adminMessages = [
+    { role: "user", content: "Synthetic chat history", created_at: "2026-11-05T09:01:00.000Z" },
+    { role: "assistant", content: "Synthetic assistant response", created_at: "2026-11-05T09:02:00.000Z" }
+  ];
+  const login = await loginAdmin(app);
+  const response = await app.fetch(adminRequest(`admin-lead&id=${leadId}`, {
+    cookie: login.cookie
+  }));
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.lead.id, leadId);
+  assert.equal(body.lead.contact, "synthetic@example.test");
+  assert.equal(body.lead.question, "Synthetic lead-specific request");
+  assert.equal(body.conversation.id, conversationId);
+  assert.deepEqual(body.messages.map((message) => message.content), [
+    "Synthetic chat history",
+    "Synthetic assistant response"
+  ]);
+});
+
+test("admin lead details reject invalid IDs and return 404 for a missing lead", async () => {
+  const app = loadFunction([]);
+  const login = await loginAdmin(app);
+  const invalid = await app.fetch(adminRequest("admin-lead&id=not-a-uuid", {
+    cookie: login.cookie
+  }));
+  const missing = await app.fetch(adminRequest(
+    "admin-lead&id=33333333-3333-4333-8333-333333333333",
+    { cookie: login.cookie }
+  ));
+
+  assert.equal(invalid.status, 400);
+  assert.equal((await invalid.json()).error, "Invalid lead ID");
+  assert.equal(missing.status, 404);
+  assert.equal((await missing.json()).error, "Lead not found");
 });
 
 test("admin can create and edit knowledge records without delete support", async () => {

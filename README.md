@@ -35,7 +35,7 @@ Login throttling is stored in function memory per runtime instance; it is best-e
 
 The function reads active records from the `knowledge_base` table. The SQL schema and example seed data are provided in the root directory. The seed content is demonstration material and should be verified before being used as real company information.
 
-Records whose `source` starts with `demo_` are deliberately excluded from chat search. Add only verified company information to the active knowledge base; do not promote the demonstration seed records as factual content. The chat uses relevant records as its factual source and returns an explicit no-information response when none qualify.
+Records with `is_demo = true` or whose `source` starts with `demo_` are excluded from chat search. Active records whose source identifies them as educational, demonstration, or fictional material remain searchable, but Groq is told to use their contents only as examples and every answer is prefixed with a clear warning that the information is fictional and requires confirmation. The same warning is included in the knowledge-base fallback when Groq is unavailable or returns an empty response. These records are not verified company specifications or commitments; replace them with approved company information before treating answers as factual.
 
 ## Chat API
 
@@ -49,7 +49,7 @@ Records whose `source` starts with `demo_` are deliberately excluded from chat s
 
 ## Publication
 
-The static website is published manually through Netlify. The Neon Function is deployed separately. Never upload `.env`, `node_modules`, local credentials, or local tooling configuration as website assets.
+The static website is published manually through Netlify. The Neon Function is deployed separately. The production site must point to the production Neon Function; test branch endpoints belong only in test copies. Never upload `.env`, `node_modules`, local credentials, or local tooling configuration as website assets.
 
 ## Neon Function build
 
@@ -58,8 +58,8 @@ The static website is published manually through Netlify. The Neon Function is d
 - `npm run build:function` bundles `src/index.ts` for Node.js 24 as ESM, smoke-tests the bundle without database credentials, and creates `dist/severmodul-neon-function.zip`.
 - The ZIP contains only the root `index.mjs`. It does not contain `.env` files or environment variable values. The test deployment must receive its own branch-scoped `DATABASE_URL` from Neon and a separately configured `GROQ_API_KEY`.
 - Configure `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_PASSWORD`, and `ADMIN_SESSION_SECRET` only in the server-side environment of the intended Neon Function. Never add them to the static site, client JavaScript, or repository. When adding or updating Neon Function environment variables, verify Neon Console's behavior for existing variables first so `GROQ_API_KEY` and `DATABASE_URL` are retained.
-- The current handler expects the `users`, `conversations`, `messages`, and `knowledge_base` columns declared in `001_initial_schema.sql`. Confirm that the target test branch has this schema before deployment; this build does not inspect or modify any Neon database.
-- Do not deploy the prepared archive until the target Neon project, test branch, function slug, and test-only secrets have been explicitly confirmed.
+- The current handler expects the `users`, `conversations`, `messages`, and `knowledge_base` columns declared in `001_initial_schema.sql`, including `knowledge_base.is_demo`. This build does not inspect or modify any Neon database.
+- Before deployment, explicitly verify the project, intended branch, and function slug. Use the branch-scoped function deployment command without an `--env` list unless the complete existing environment has been safely preserved.
 
 ## Local Windows development network
 

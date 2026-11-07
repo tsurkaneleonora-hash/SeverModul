@@ -84,6 +84,7 @@ module.exports = `<!doctype html>
           <button class="secondary" type="submit">Найти</button>
         </form>
         <div class="table-wrap"><table><thead><tr><th>Дата</th><th>Имя / контакт</th><th>Вопрос</th><th>Статус</th><th>Диалог</th></tr></thead><tbody id="leadsBody"></tbody></table></div>
+        <div id="leadDetails" class="record hidden"></div>
         <div id="leadsNotice" class="notice" role="status"></div>
       </section>
       <section id="conversationsTab" class="tab panel hidden">
@@ -153,10 +154,29 @@ module.exports = `<!doctype html>
         for(const lead of data.leads){const row=document.createElement('tr');row.append(el('td',date(lead.created_at)));
           row.append(el('td',[lead.name||'—',lead.contact||'—'].join('\\n')));
           row.append(el('td',lead.question||'—','question'));row.append(el('td'));row.lastChild.append(statusSelect(lead));
-          const dialog=el('button',lead.conversation_id?'Открыть':'—','secondary');if(lead.conversation_id)dialog.addEventListener('click',()=>openConversation(lead.conversation_id));
+          const dialog=el('button','Открыть','secondary');dialog.type='button';dialog.addEventListener('click',()=>openLead(lead.id));
           row.append(el('td'));row.lastChild.append(dialog);body.append(row);}
         setNotice('leadsNotice',data.leads.length?'':'Заявок не найдено.');
       }catch(error){setNotice('leadsNotice',error.message);}
+    }
+    async function openLead(id) {
+      const box=$('leadDetails');box.classList.remove('hidden');box.replaceChildren(el('p','Загружаем заявку и переписку…'));
+      try {
+        const data=await api('admin-lead&id='+encodeURIComponent(id));
+        const lead=data.lead;
+        box.replaceChildren(el('h3','Заявка '+lead.id));
+        box.append(el('p','Дата: '+date(lead.created_at)+' · Статус: '+(statusLabels[lead.status]||lead.status)));
+        box.append(el('p','Имя: '+(lead.name||'—')+' · Контакт: '+(lead.contact||'—')));
+        box.append(el('h4','Обращение'));
+        box.append(el('pre',lead.question||'—'));
+        box.append(el('h4','История диалога'));
+        if(data.messages.length===0)box.append(el('p','Сообщений в диалоге пока нет.','muted'));
+        const messages=el('div',undefined,'message-list');
+        for(const message of data.messages){const item=el('div',undefined,'message '+message.role);item.append(el('small',(message.role==='user'?'Клиент':message.role==='assistant'?'Консультант':'Система')+' · '+date(message.created_at)));item.append(el('span',message.content));messages.append(item);}
+        if(data.messages.length)box.append(messages);
+        const close=el('button','Закрыть','secondary');close.type='button';close.addEventListener('click',()=>box.classList.add('hidden'));box.append(close);
+        box.scrollIntoView({behavior:'smooth',block:'start'});
+      }catch(error){box.replaceChildren(el('p','Не удалось открыть заявку: '+error.message));}
     }
     async function loadConversations() {
       setNotice('conversationsNotice','Загружаем…');
