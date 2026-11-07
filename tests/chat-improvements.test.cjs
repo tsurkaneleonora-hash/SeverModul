@@ -7,6 +7,7 @@ const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
 const adminPage = require("../src/admin-page.cjs");
+const renderChatMarkdown = require("../chat-markdown.js");
 
 const sourcePath = path.resolve(__dirname, "..", "src", "index.ts");
 const originalDatabaseUrl = process.env.DATABASE_URL;
@@ -17,8 +18,45 @@ const originalAdminPassword = process.env.ADMIN_PASSWORD;
 const originalAdminSessionSecret = process.env.ADMIN_SESSION_SECRET;
 const originalFetch = global.fetch;
 const originalConsoleError = console.error;
+const originalDocument = global.document;
+const originalRenderChatMarkdown = global.renderChatMarkdown;
 let state;
 let logs;
+
+class TestTextNode {
+  constructor(text) {
+    this.textContent = text;
+    this.nodeType = 3;
+  }
+}
+
+class TestElement {
+  constructor(tagName) {
+    this.tagName = tagName.toLowerCase();
+    this.children = [];
+    this.className = "";
+    this._text = "";
+  }
+
+  appendChild(child) {
+    this.children.push(child);
+    return child;
+  }
+
+  replaceChildren(...children) {
+    this.children = children;
+    this._text = "";
+  }
+
+  set textContent(value) {
+    this._text = String(value);
+    this.children = [];
+  }
+
+  get textContent() {
+    return this._text + this.children.map((child) => child.textContent).join("");
+  }
+}
 
 function loadFunction(rows) {
   process.env.DATABASE_URL = "postgresql://test.invalid/db";
@@ -401,10 +439,13 @@ test("active educational records with is_demo=false are used with a clear Groq d
   assert.equal(body.results.length, 1);
   assert.equal(body.results[0].id, warrantyRecord.id);
   assert.equal("isEducational" in body.results[0], false);
+  assert.equal(groqRequest.max_completion_tokens, 600);
   assert.match(prompt, /"is_educational_demo":true/u);
-  assert.match(groqRequest.messages[0].content, /Используй учебные и демонстрационные материалы по существу вопроса/u);
-  assert.match(body.answer, /^Демонстрационные сведения/u);
-  assert.match(body.answer, /требуют подтверждения/u);
+  assert.match(groqRequest.messages[0].content, /сервер автоматически добавляет короткую пометку/u);
+  assert.equal(
+    body.answer,
+    "Демонстрационная информация — требует подтверждения\n\nВ учебной карточке указан срок гарантии 12 лет."
+  );
   assert.match(body.answer, /гарантии 12 лет/u);
 });
 
@@ -434,12 +475,76 @@ test("educational fallback is explicitly labeled when Groq fails or returns empt
 
       assert.equal(response.status, 200);
       assert.equal(body.answer_source, "knowledge_base");
-      assert.match(body.answer, /^Демонстрационные сведения/u);
-      assert.match(body.answer, /требуют подтверждения/u);
-      assert.ok(body.answer.includes(body.results[0].content));
+      assert.match(body.answer, /^Демонстрационная информация — требует подтверждения\n\n/u);
+      assert.equal(
+        body.answer,
+        `Демонстрационная информация — требует подтверждения\n\n${body.results[0].title}\n\n${body.results[0].content}`
+      );
+      assert.equal(
+        body.answer.split("Демонстрационная информация — требует подтверждения").length - 1,
+        1
+      );
       assert.doesNotMatch(JSON.stringify(logs), /private Groq transport detail|test-only/u);
     });
   }
+});
+
+test("chat markdown renders headings, lists, paragraphs and inline emphasis as safe DOM", () => {
+  global.document = {
+    createElement: (tagName) => new TestElement(tagName),
+    createTextNode: (text) => new TestTextNode(text)
+  };
+  try {
+    const warning = new TestElement("div");
+    renderChatMarkdown(warning, "Демонстрационная информация — требует подтверждения");
+    assert.equal(warning.children.length, 1);
+    assert.equal(warning.children[0].className, "chat-disclaimer");
+    assert.equal(warning.children[0].textContent, "Демонстрационная информация — требует подтверждения");
+
+    const container = new TestElement("div");
+    renderChatMarkdown(
+      container,
+      "# Проект\n\nПолный **важный** текст.\nСледующая строка.\n\n- Первый пункт\n- Второй пункт\n\n1. Первый шаг\n2. Второй шаг\n\n`<script>alert(1)</script>`"
+    );
+
+    assert.deepEqual(
+      container.children.map((element) => element.tagName),
+      ["h3", "p", "ul", "ol", "p"]
+    );
+    assert.equal(container.children[0].textContent, "Проект");
+    assert.equal(container.children[1].textContent, "Полный важный текст. Следующая строка.");
+    assert.equal(container.children[1].children[1].tagName, "strong");
+    assert.deepEqual(
+      container.children[2].children.map((item) => item.textContent),
+      ["Первый пункт", "Второй пункт"]
+    );
+    assert.deepEqual(
+      container.children[3].children.map((item) => item.textContent),
+      ["Первый шаг", "Второй шаг"]
+    );
+    assert.equal(container.children[4].textContent, "<script>alert(1)</script>");
+    assert.equal(
+      container.children[4].children[0].tagName,
+      "code"
+    );
+  } finally {
+    if (originalDocument === undefined) delete global.document;
+    else global.document = originalDocument;
+    if (originalRenderChatMarkdown === undefined) delete global.renderChatMarkdown;
+    else global.renderChatMarkdown = originalRenderChatMarkdown;
+  }
+});
+
+test("chat answer renderer is wired for responsive desktop and mobile messages", () => {
+  const html = fs.readFileSync(path.resolve(__dirname, "..", "index.html"), "utf8");
+
+  assert.match(html, /<script src="chat-markdown\.js"><\/script>/u);
+  assert.match(html, /window\.renderChatMarkdown\(content, text\)/u);
+  assert.match(html, /\.chat-msg\.bot \.chat-rich ul/u);
+  assert.match(html, /\.chat-msg\.bot \.chat-rich ol/u);
+  assert.match(html, /\.chat-msg\.bot\{[^}]*max-width:96%/su);
+  assert.match(html, /@media\(max-width:520px\)/u);
+  assert.match(html, /overflow-wrap:anywhere/u);
 });
 
 test("greetings are handled without a knowledge-base lookup and saved to history", async () => {

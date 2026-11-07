@@ -5,6 +5,7 @@ SeverModul is a Russian-language demo website for a modular-home company. It inc
 ## Project structure
 
 - `index.html` — static website and browser-side chat interface.
+- `chat-markdown.js` — safe formatting of chat headings, lists, paragraphs, and inline emphasis.
 - `src/index.ts` — Neon Function request handler, knowledge-base search, and answer generation.
 - `001_initial_schema.sql` — PostgreSQL schema, indexes, and timestamp triggers.
 - `002_seed_knowledge_base.sql` — example knowledge-base records.
@@ -35,7 +36,7 @@ Login throttling is stored in function memory per runtime instance; it is best-e
 
 The function reads active records from the `knowledge_base` table. The SQL schema and example seed data are provided in the root directory. The seed content is demonstration material and should be verified before being used as real company information.
 
-Records with `is_demo = true` or whose `source` starts with `demo_` are excluded from chat search. Active records whose source identifies them as educational, demonstration, or fictional material remain searchable, but Groq is told to use their contents only as examples and every answer is prefixed with a clear warning that the information is fictional and requires confirmation. The same warning is included in the knowledge-base fallback when Groq is unavailable or returns an empty response. These records are not verified company specifications or commitments; replace them with approved company information before treating answers as factual.
+Records with `is_demo = true` or whose `source` starts with `demo_` are excluded from chat search. Active records whose source identifies them as educational, demonstration, or fictional material remain searchable, and Groq can use their contents to answer relevant questions. Each such answer and the knowledge-base fallback is prefixed with `Демонстрационная информация — требует подтверждения`. The browser safely renders Markdown-style headings, lists, paragraphs, and inline emphasis; chat answers are not shortened in the client. These records are not verified company specifications or commitments; replace them with approved company information before treating answers as factual.
 
 ## Chat API
 
