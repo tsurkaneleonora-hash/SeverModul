@@ -412,14 +412,26 @@ footer{border-top:1px solid var(--line);padding:80px 0 40px;background:var(--bg)
 }
 .chat-msg.bot{
   align-self:flex-start;
+  max-width:96%;
   background:var(--surface);color:var(--ink);
   border:1px solid var(--line);
   border-bottom-left-radius:4px;
+  overflow-wrap:anywhere;
 }
-.chat-msg.bot b{font-family:var(--font-display);font-weight:600;}
-.chat-msg.bot .chat-list{margin-top:8px;display:grid;gap:4px;}
-.chat-msg.bot .chat-list li{list-style:none;padding-left:18px;position:relative;}
-.chat-msg.bot .chat-list li::before{content:"·";position:absolute;left:6px;color:var(--accent);font-weight:700;}
+.chat-msg.bot .chat-rich{display:grid;gap:8px;white-space:normal;}
+.chat-msg.bot .chat-rich p{margin:0;}
+.chat-msg.bot .chat-rich h3,
+.chat-msg.bot .chat-rich h4,
+.chat-msg.bot .chat-rich h5,
+.chat-msg.bot .chat-rich h6{font-family:var(--font-body);font-size:1em;font-weight:700;line-height:1.4;margin:2px 0 0;}
+.chat-msg.bot .chat-rich ul,
+.chat-msg.bot .chat-rich ol{margin:0;padding-left:22px;display:grid;gap:4px;}
+.chat-msg.bot .chat-rich ul{list-style:disc;}
+.chat-msg.bot .chat-rich li{padding-left:2px;}
+.chat-msg.bot .chat-rich strong{font-weight:700;}
+.chat-msg.bot .chat-rich em{font-style:italic;}
+.chat-msg.bot .chat-rich code{padding:1px 4px;border-radius:4px;background:var(--bg-soft);font-size:.92em;overflow-wrap:anywhere;}
+.chat-msg.bot .chat-disclaimer{font-size:12px;color:var(--ink-soft);}
 .chat-retry{display:block;margin-top:8px;padding:0;background:none;color:var(--accent);font:inherit;font-weight:600;text-decoration:underline;}
 .chat-lead-offer{align-self:flex-start;width:min(85%,360px);}
 .chat-lead-offer>button,.chat-lead-form button{padding:9px 14px;border:1px solid var(--accent);border-radius:100px;background:var(--surface);color:var(--accent);font:inherit;font-size:13px;font-weight:600;}
@@ -981,6 +993,7 @@ footer{border-top:1px solid var(--line);padding:80px 0 40px;background:var(--bg)
   <svg class="ic-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
 </button>
 
+<script src="chat-markdown.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1279,7 +1292,14 @@ document.querySelectorAll('.rev-nav button').forEach(btn => {
   function addTextMessage(text, role){
     const message = document.createElement('div');
     message.className = 'chat-msg ' + (role === 'user' ? 'user' : 'bot');
-    message.textContent = text;
+    if (role === 'user') {
+      message.textContent = text;
+    } else {
+      const content = document.createElement('div');
+      content.className = 'chat-rich';
+      window.renderChatMarkdown(content, text);
+      message.appendChild(content);
+    }
     body.appendChild(message);
     body.scrollTop = body.scrollHeight;
     return message;
